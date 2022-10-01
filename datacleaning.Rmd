@@ -1,0 +1,66 @@
+```{r}
+library(pdftools)
+library(dplyr)
+library(rvest)
+library(rlang)
+library(furrr)
+library(doParallel)
+library(foreach)
+```
+```{r}
+contracts = function(i) 
+{
+y=read_html(paste("https://www.fpds.gov/ezsearch/fpdsportal?q=VENDOR_FULL_NAME%3A%22RAYTHEON+COMPANY%22+CONTRACT_FISCAL_YEAR%3A%22",as.character(i),"%22&s=FPDS.GOV&templateName=1.5.2&indexName=awardfull&x=22&y=13", sep="")) %>% html_element(xpath='//*[(@id = "csvLink")]') %>% html_attr("href")
+year_x <- read.csv(paste("https://www.fpds.gov/ezsearch/fpdsportal",y, sep=""))
+year_name <- paste("year",i, sep = "")
+assign(year_name,year_x)  
+}
+```
+
+```{r}
+Sys.setenv(http_proxy="http://proxyserver:port")
+```
+
+```{r}
+parallel::detectCores()
+n.cores <- parallel::detectCores() - 1
+```
+```{r}
+#create the cluster
+my.cluster <- parallel::makeCluster(
+  n.cores, 
+  type = "PSOCK"
+  )
+
+#check cluster definition (optional)
+print(my.cluster)
+
+#register it to be used by %dopar%
+doParallel::registerDoParallel(cl = my.cluster)
+
+#check if it is registered (optional)
+foreach::getDoParRegistered()
+
+#how many workers are available? (optional)
+foreach::getDoParWorkers()
+```
+
+
+```{r}
+contracts <- foreach(i = 1979:2022, .combine = 'rbind') %dopar% {
+  library(rvest)
+  library(dplyr)
+  y=read_html(paste("https://www.fpds.gov/ezsearch/fpdsportal?q=VENDOR_FULL_NAME%3A%22RAYTHEON+COMPANY%22+CONTRACT_FISCAL_YEAR%3A%22",as.character(i),"%22&s=FPDS.GOV&templateName=1.5.2&indexName=awardfull&x=22&y=13", sep="")) %>% html_element(xpath='//*[(@id = "csvLink")]') %>% html_attr("href")
+  year_x <- read.csv(paste("https://www.fpds.gov/ezsearch/fpdsportal",y, sep=""))
+  year_name <- paste("year",i, sep = "")
+  assign(year_name,year_x)
+}
+```
+```{r}
+parallel::stopCluster(cl = my.cluster)
+```
+
+```{r}
+write.csv(contracts, "raytheonContracts.csv")
+```
+
