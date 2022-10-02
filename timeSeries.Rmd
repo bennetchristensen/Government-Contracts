@@ -1,30 +1,180 @@
 ---
-title: "Untitled"
+title: "Raytheon Contracts"
 author: "Ben Christensen"
 date: "2022-10-01"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r}
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(lubridate) #install.packages('lubridate') if needed
+library(astsa)
+library(splines)
+```
+```{r}
+stocks <-read.csv("RTX.csv")
+contracts <- read.csv("raytheonContracts.csv")
+```
+```{r}
+stocks <- stocks %>% 
+  mutate(Date = as.Date(Date), 
+         month = month(Date), 
+         year = year(Date), 
+         decimal_date = month / 12 + year,
+         change = Close - Open,
+         recession = if_else(year == 2009, 1, 0),
+         pandemic = if_else(year == 2020, 1,0),
+         decade = (year-year%%10),
+         decade_decimal_date=decimal_date-decade) %>%
+  filter(year > 1979, year < 2019)
+```
+```{r}
+contracts <- contracts %>%
+  filter(Action.Obligation.... !="$0.00")
 ```
 
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r}
+contracts <- contracts %>%
+  mutate(Date = parse_date_time(Date.Signed, orders = "mdy"), actionObligation = str_replace_all(Action.Obligation....,"\\$", ""), actionObligation = as.numeric(str_replace_all(actionObligation,",", "")))
+```
+```{r}
+contractsSum <- contracts %>%
+  group_by(Date) %>%
+  filter(actionObligation >= 0) %>%
+  mutate(sum = sum(actionObligation))
+contractsSum<-contractsSum %>% add_count(Date)
+```
+```{r}
+contractsSimp <- as.data.frame(c(contractsSum[29],contractsSum[31], contractsSum[32]))
+combine <- left_join(stocks, contractsSimp,by="Date")
+combine <- combine[!duplicated(combine[c('Date')]),]
+combine$sum[is.na(combine$sum)] <- 0
+combine$n[is.na(combine$n)] <- 0
+nozero <- combine %>%
+  filter(sum != 0)
 ```
 
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r}
+# Plot 1: 
+ggplot(data = stocks, aes(y= Adj.Close, x = Date)) + geom_line() + 
+  labs(title = "RTX Stock Prices") +
+  theme_classic() + 
+  geom_smooth() 
+```
+```{r}
+# Plot 1: 
+ggplot(data = contracts, aes( x = Date)) + geom_histogram() + 
+  labs(title = "Contracts") +
+  theme_classic() 
+```
+```{r}
+# Plot 1: 
+ggplot(data = combine, aes(y= n, x = decimal_date)) + geom_line() + 
+  labs(title = "RTX Stock Prices") +
+  theme_classic() + 
+  geom_smooth() 
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r}
+# Plot 1: 
+ggplot(data = contracts, aes(x=Date, y =actionObligation)) + geom_point() + 
+  labs(title = "Contracts") +
+  theme_classic() + 
+  geom_smooth()
+```
+```{r}
+# Plot 1: 
+ggplot(data = contractsSum, aes(x=Date, y =sum, group_by(Date))) + geom_line() + 
+  labs(title = "Contracts") +
+  theme_classic() +
+  geom_smooth()
+```
+
+
+```{r}
+# Plot 1: 
+ggplot(data = combine, aes(x=change, y =sum)) + geom_point() + 
+  labs(title = "Contracts vs change in stock price") +
+  theme_classic()+
+  geom_smooth()
+```
+```{r}
+# Plot 1: 
+ggplot(data = combine, aes(y= Adj.Close, x = decade_decimal_date,group = decade)) + geom_line() + 
+  facet_wrap(~decade) + 
+  labs(title = "Stock Price Seperated by Year") +
+  theme_classic()
+```
+
+```{r}
+combine <- combine %>% 
+  mutate(prediction_trend = predict(lm(Adj.Close ~ poly(decimal_date,5)+ n)))
+combine <- combine %>%
+  mutate(prediction_trend2 = predict(loess(Adj.Close ~ decimal_date, data = combine, span = 0.25)))
+
+combine  %>% 
+  ggplot(aes(x = decimal_date, y = Adj.Close)) +
+  geom_line() +
+  geom_line(aes(y = prediction_trend), color = 'red') +
+  theme_classic() +
+  geom_line(aes(y = prediction_trend2), color = 'blue')
+```
+```{r}
+combine <- combine %>%
+  mutate(Detrend = Adj.Close - prediction_trend2)
+
+combine %>% 
+  ggplot(aes(x = decimal_date, y = Detrend)) + geom_smooth() + geom_point() + geom_line() + theme_classic()
+```
+```{r}
+lm.season <- lm(Detrend ~ decimal_date * recession * pandemic, data = combine)
+
+combine <- combine %>%
+    mutate(season_close = predict(lm.season, newdata = combine))
+
+combine %>%
+    ggplot(aes(x = month, y = Detrend, group = year)) + geom_point() + geom_line() +
+    geom_line(aes(y = season_close), color = "purple", size = 2) + geom_hline(yintercept = 0) +
+    theme_classic()
+```
+
+```{r}
+combine <- combine %>% 
+  mutate(Errors = Detrend - season_close) 
+
+combine %>% 
+  ggplot(aes(x = decimal_date, y = Errors)) + geom_point() + geom_line() + 
+  geom_hline(yintercept = 0) + theme_classic()
+```
+
+```{r}
+stock_data <- ts(combine$Adj.Close, start = c(1979,360), frequency = 720) # ts (time series) objects keeps track of time and the values.
+
+plot(diff(diff(stock_data,lag = 1),lag = 360))
+```
+
+```{r}
+astsa::acf2(na.omit(combine$Errors))
+```
+
+```{r}
+stock.ARfit <- sarima(combine$Errors, p = 1, d = 0, q = 0) #AR Model
+stock.MAfit <- sarima(combine$Errors, p = 0, d = 0, q = 10)  #MA Model
+stock.ARMAfit <- sarima(combine$Errors, p = 1, d = 0, q = 1) #ARMA Model
+```
+
+```{r}
+matrix(c("BIC for AR", round(stock.ARfit$BIC,3) ,"BIC for MA", round(stock.MAfit$BIC,3) ,"BIC for ARMA",round(stock.ARMAfit$BIC,3)),nrow=2)
+```
+
+```{r}
+
+trend.mod <- lm(Adj.Close ~ poly(decimal_date,4,raw=TRUE), data= combine )
+X = model.matrix(trend.mod)[,-1] #removes intercept column
+
+combine  %>% pull(Adj.Close) %>%
+ts(start = 1979, frequency = 1080) %>%
+sarima(p=1,d=0,q=0, xreg = X)
+```
