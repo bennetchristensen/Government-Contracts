@@ -23,6 +23,7 @@ stocks <- stocks %>%
   mutate(Date = as.Date(Date), 
          month = month(Date), 
          year = year(Date), 
+         day = day(Date),
          decimalDate = decimal_date(Date),
          change = Close - Open,
          recession = if_else(year == 2009, 1, 0),
@@ -30,7 +31,7 @@ stocks <- stocks %>%
          decade = (year-year%%10),
          decade_decimalDate=decimalDate-decade,
          logClose = log(Adj.Close)) %>%
-  filter(year > 1979, year < 2019)
+  filter(year > 1979, year < 2019) 
 ```
 ```{r}
 contracts <- contracts %>%
@@ -45,15 +46,17 @@ contracts <- contracts %>%
 contractsSum <- contracts %>%
   group_by(Date) %>%
   filter(actionObligation >= 0) %>%
-  mutate(sum = sum(actionObligation))
+  mutate(sum = sum(actionObligation),
+         logContract = log(actionObligation))
 contractsSum<-contractsSum %>% add_count(Date)
 ```
 ```{r}
-contractsSimp <- as.data.frame(c(contractsSum[29],contractsSum[31], contractsSum[32]))
+contractsSimp <- as.data.frame(c(contractsSum[29],contractsSum[31], contractsSum[32], contractsSum[33]))
 combine <- left_join(stocks, contractsSimp,by="Date")
 combine <- combine[!duplicated(combine[c('Date')]),]
 combine$sum[is.na(combine$sum)] <- 0
 combine$n[is.na(combine$n)] <- 0
+combine$logContract[is.na(combine$logContract)] <-0
 nozero <- combine %>%
   filter(sum != 0)
 ```
@@ -67,7 +70,7 @@ ggplot(data = stocks, aes(y= logClose, x = decimalDate)) + geom_line() +
 ```
 ```{r}
 # Plot 1: 
-ggplot(data = contracts, aes( x = Date)) + geom_histogram() + 
+ggplot(data = combine, aes( x = decimalDate)) + geom_histogram() + 
   labs(title = "Contracts") +
   theme_classic() 
 ```
@@ -104,7 +107,7 @@ ggplot(data = combine, aes(x=change, y =sum)) + geom_point() +
 ```
 ```{r}
 # Plot 1: 
-ggplot(data = combine, aes(y= Adj.Close, x = decade_decimalDate,group = decade)) + geom_line() + 
+ggplot(data = combine, aes(y= logClose, x = decade_decimalDate,group = decade)) + geom_line() + 
   facet_wrap(~decade) + 
   labs(title = "Stock Price Seperated by Year") +
   theme_classic()
@@ -116,20 +119,21 @@ lm(logClose ~ n, data = combine) %>%
 
 ```{r}
 combine <- combine %>% 
-  mutate(prediction_trend = predict(lm(logClose ~ poly(decimalDate,5)+ n)))
+  mutate(prediction_trend = predict(lm(logClose ~ poly(decimalDate,5)+ logContract)))
 combine <- combine %>%
-  mutate(prediction_trend2 = predict(loess(logClose ~ decimalDate, data = combine, span = 0.25)))
+  mutate(prediction_trend2 = predict(loess(logClose ~ decimalDate + logContract, data = combine, span = 0.25)))
 
 combine  %>% 
   ggplot(aes(x = decimalDate, y = logClose)) +
   geom_line() +
+  xlim(c(2000, 2019))
   geom_line(aes(y = prediction_trend), color = 'red') +
   theme_classic() +
   geom_line(aes(y = prediction_trend2), color = 'blue')
 ```
 ```{r}
 combine <- combine %>%
-  mutate(Detrend = logClose - prediction_trend2)
+  mutate(Detrend = logClose - prediction_trend)
 
 combine %>% 
   ggplot(aes(x = decimalDate, y = Detrend)) + geom_smooth() + geom_point() + geom_line() + theme_classic()
@@ -141,7 +145,7 @@ combine <- combine %>%
     mutate(season_close = predict(lm.season, newdata = combine))
 
 combine %>%
-    ggplot(aes(x = month, y = Detrend, group = year)) + geom_point() + geom_line() +
+    ggplot(aes(x = day, y = Detrend, group = year)) + geom_point() + geom_line() +
     geom_line(aes(y = season_close), color = "purple", size = 2) + geom_hline(yintercept = 0) +
     theme_classic()
 ```
@@ -176,11 +180,10 @@ matrix(c("BIC for AR", round(stock.ARfit$BIC,3) ,"BIC for MA", round(stock.MAfit
 ```
 
 ```{r}
-
-trend.mod <- lm(Adj.Close ~ poly(decimalDate,4,raw=TRUE), data= combine )
+trend.mod <- lm(logClose ~ poly(decimalDate,5) + logContract, data=combine )
 X = model.matrix(trend.mod)[,-1] #removes intercept column
 
-combine  %>% pull(Adj.Close) %>%
-ts(start = 1979, frequency = ) %>%
+combine %>% pull(logClose) %>%
+ts(start = c(1980,1), frequency = 365) %>%
 sarima(p=1,d=0,q=0, xreg = X)
 ```
