@@ -12,6 +12,7 @@ library(readr)
 library(lubridate) #install.packages('lubridate') if needed
 library(astsa)
 library(splines)
+library(stringr)
 ```
 ```{r}
 stocks <-read.csv("RTX.csv")
@@ -22,12 +23,13 @@ stocks <- stocks %>%
   mutate(Date = as.Date(Date), 
          month = month(Date), 
          year = year(Date), 
-         decimal_date = month / 12 + year,
+         decimalDate = decimal_date(Date),
          change = Close - Open,
          recession = if_else(year == 2009, 1, 0),
          pandemic = if_else(year == 2020, 1,0),
          decade = (year-year%%10),
-         decade_decimal_date=decimal_date-decade) %>%
+         decade_decimalDate=decimalDate-decade,
+         logClose = log(Adj.Close)) %>%
   filter(year > 1979, year < 2019)
 ```
 ```{r}
@@ -58,10 +60,10 @@ nozero <- combine %>%
 
 ```{r}
 # Plot 1: 
-ggplot(data = stocks, aes(y= Adj.Close, x = Date)) + geom_line() + 
+ggplot(data = stocks, aes(y= logClose, x = decimalDate)) + geom_line() + 
   labs(title = "RTX Stock Prices") +
-  theme_classic() + 
-  geom_smooth() 
+  geom_smooth()
+  theme_classic()
 ```
 ```{r}
 # Plot 1: 
@@ -71,7 +73,7 @@ ggplot(data = contracts, aes( x = Date)) + geom_histogram() +
 ```
 ```{r}
 # Plot 1: 
-ggplot(data = combine, aes(y= n, x = decimal_date)) + geom_line() + 
+ggplot(data = combine, aes(y= n, x = decimalDate)) + geom_line() + 
   labs(title = "RTX Stock Prices") +
   theme_classic() + 
   geom_smooth() 
@@ -102,20 +104,24 @@ ggplot(data = combine, aes(x=change, y =sum)) + geom_point() +
 ```
 ```{r}
 # Plot 1: 
-ggplot(data = combine, aes(y= Adj.Close, x = decade_decimal_date,group = decade)) + geom_line() + 
+ggplot(data = combine, aes(y= Adj.Close, x = decade_decimalDate,group = decade)) + geom_line() + 
   facet_wrap(~decade) + 
   labs(title = "Stock Price Seperated by Year") +
   theme_classic()
 ```
+```{r}
+lm(logClose ~ n, data = combine) %>%
+  summary()
+```
 
 ```{r}
 combine <- combine %>% 
-  mutate(prediction_trend = predict(lm(Adj.Close ~ poly(decimal_date,5)+ n)))
+  mutate(prediction_trend = predict(lm(logClose ~ poly(decimalDate,5)+ n)))
 combine <- combine %>%
-  mutate(prediction_trend2 = predict(loess(Adj.Close ~ decimal_date, data = combine, span = 0.25)))
+  mutate(prediction_trend2 = predict(loess(logClose ~ decimalDate, data = combine, span = 0.25)))
 
 combine  %>% 
-  ggplot(aes(x = decimal_date, y = Adj.Close)) +
+  ggplot(aes(x = decimalDate, y = logClose)) +
   geom_line() +
   geom_line(aes(y = prediction_trend), color = 'red') +
   theme_classic() +
@@ -123,13 +129,13 @@ combine  %>%
 ```
 ```{r}
 combine <- combine %>%
-  mutate(Detrend = Adj.Close - prediction_trend2)
+  mutate(Detrend = logClose - prediction_trend2)
 
 combine %>% 
-  ggplot(aes(x = decimal_date, y = Detrend)) + geom_smooth() + geom_point() + geom_line() + theme_classic()
+  ggplot(aes(x = decimalDate, y = Detrend)) + geom_smooth() + geom_point() + geom_line() + theme_classic()
 ```
 ```{r}
-lm.season <- lm(Detrend ~ decimal_date * recession * pandemic, data = combine)
+lm.season <- lm(Detrend ~ decimalDate * recession * pandemic, data = combine)
 
 combine <- combine %>%
     mutate(season_close = predict(lm.season, newdata = combine))
@@ -145,12 +151,12 @@ combine <- combine %>%
   mutate(Errors = Detrend - season_close) 
 
 combine %>% 
-  ggplot(aes(x = decimal_date, y = Errors)) + geom_point() + geom_line() + 
+  ggplot(aes(x = decimalDate, y = Errors)) + geom_point() + geom_line() + 
   geom_hline(yintercept = 0) + theme_classic()
 ```
 
 ```{r}
-stock_data <- ts(combine$Adj.Close, start = c(1979,360), frequency = 720) # ts (time series) objects keeps track of time and the values.
+stock_data <- ts(combine$logClose, start = c(1979,360), frequency = 720) # ts (time series) objects keeps track of time and the values.
 
 plot(diff(diff(stock_data,lag = 1),lag = 360))
 ```
@@ -161,7 +167,7 @@ astsa::acf2(na.omit(combine$Errors))
 
 ```{r}
 stock.ARfit <- sarima(combine$Errors, p = 1, d = 0, q = 0) #AR Model
-stock.MAfit <- sarima(combine$Errors, p = 0, d = 0, q = 10)  #MA Model
+stock.MAfit <- sarima(combine$Errors, p = 0, d = 0, q = 1)  #MA Model
 stock.ARMAfit <- sarima(combine$Errors, p = 1, d = 0, q = 1) #ARMA Model
 ```
 
@@ -171,10 +177,10 @@ matrix(c("BIC for AR", round(stock.ARfit$BIC,3) ,"BIC for MA", round(stock.MAfit
 
 ```{r}
 
-trend.mod <- lm(Adj.Close ~ poly(decimal_date,4,raw=TRUE), data= combine )
+trend.mod <- lm(Adj.Close ~ poly(decimalDate,4,raw=TRUE), data= combine )
 X = model.matrix(trend.mod)[,-1] #removes intercept column
 
 combine  %>% pull(Adj.Close) %>%
-ts(start = 1979, frequency = 1080) %>%
+ts(start = 1979, frequency = ) %>%
 sarima(p=1,d=0,q=0, xreg = X)
 ```
