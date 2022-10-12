@@ -17,7 +17,14 @@ library(stringr)
 ```{r}
 stocks <-read.csv("RTX.csv")
 contracts <- read.csv("raytheonContracts.csv")
+house <- read.csv("house.csv")
+96th (1979–1981)
 ```
+```{r}
+house <- house %>%
+  mutate()
+```
+
 ```{r}
 stocks <- stocks %>% 
   mutate(Date = as.Date(Date), 
