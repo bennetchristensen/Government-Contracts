@@ -6,6 +6,7 @@ library(rlang)
 library(furrr)
 library(doParallel)
 library(foreach)
+library(xml2)
 ```
 ```{r}
 contracts = function(i) 
@@ -16,6 +17,68 @@ year_name <- paste("year",i, sep = "")
 assign(year_name,year_x)  
 }
 ```
+
+```{r}
+readUrl <- function(url) {
+    out <- tryCatch(
+        {
+            # Just to highlight: if you want to use more than one 
+            # R expression in the "try" part then you'll have to 
+            # use curly brackets.
+            # 'tryCatch()' will return the last evaluated expression 
+            # in case the "try" part was completed successfully
+
+            message("This is the 'try' part")
+
+            read_html(paste(url, sep="")) %>% html_element(xpath='//*[(@id = "csvLink")]') %>% html_attr("href")
+            # The return value of `readLines()` is the actual value 
+            # that will be returned in case there is no condition 
+            # (e.g. warning or error). 
+            # You don't need to state the return value via `return()` as code 
+            # in the "try" part is not wrapped inside a function (unlike that
+            # for the condition handlers for warnings and error below)
+        },
+        error=function(cond) {
+            message(paste("URL does not seem to exist:", url))
+            message("Here's the original error message:")
+            message(cond)
+            # Choose a return value in case of error
+            return(NA)
+        },
+        warning=function(cond) {
+            message(paste("URL caused a warning:", url))
+            message("Here's the original warning message:")
+            message(cond)
+            # Choose a return value in case of warning
+            return(NULL)
+        },
+        finally={
+        # NOTE:
+        # Here goes everything that should be executed at the end,
+        # regardless of success or error.
+        # If you want more than one expression to be executed, then you 
+        # need to wrap them in curly brackets ({...}); otherwise you could
+        # just have written 'finally=<expression>' 
+            message(paste("Processed URL:", url))
+            message("Some other message at the end")
+        }
+    )    
+    return(out)
+}
+```
+
+
+```{r}
+y <- readUrl("https://www.fpds.gov/ezsearch/fpdsportal?q=VENDOR_FULL_NAME%3A%22RAYTHEON+COMPANY%22+CONTRACT_FISCAL_YEAR%3A%221950%22&s=FPDS.GOV&templateName=1.5.2&indexName=awardfull&x=22&y=13")
+if (is.na(y)==FALSE) { year_x <- read.csv(paste("https://www.fpds.gov/ezsearch/fpdsportal",y, sep=""))}
+```
+
+
+```{r}
+y=read_html(paste('https://www.fpds.gov/ezsearch/fpdsportal?q=GLOBAL_VENDOR_NAME%3A"The+Boeing+Company"+CONTRACT_FISCAL_YEAR%3A%222010%22&s=FPDS.GOV&templateName=1.5.2&indexName=awardfull&x=22&y=13', sep="")) %>%  html_element(xpath='//b')
+xml_attrs(y)
+```
+
 
 ```{r}
 Sys.setenv(http_proxy="http://proxyserver:port")
@@ -46,16 +109,114 @@ foreach::getDoParWorkers()
 ```
 
 
+
 ```{r}
 contracts <- foreach(i = 1979:2022, .combine = 'rbind') %dopar% {
   library(rvest)
   library(dplyr)
   y=read_html(paste("https://www.fpds.gov/ezsearch/fpdsportal?q=VENDOR_FULL_NAME%3A%22RAYTHEON+COMPANY%22+CONTRACT_FISCAL_YEAR%3A%22",as.character(i),"%22&s=FPDS.GOV&templateName=1.5.2&indexName=awardfull&x=22&y=13", sep="")) %>% html_element(xpath='//*[(@id = "csvLink")]') %>% html_attr("href")
-  year_x <- read.csv(paste("https://www.fpds.gov/ezsearch/fpdsportal",y, sep=""))
+  if (is.na(y)==FALSE) { year_x <- read.csv(paste("https://www.fpds.gov/ezsearch/fpdsportal",y, sep=""))
   year_name <- paste("year",i, sep = "")
-  assign(year_name,year_x)
+  assign(year_name,year_x) }
 }
 ```
+
+```{r}
+contracts1 <- foreach(i = 1965:1999, .combine = 'rbind') %dopar% {
+  library(rvest)
+  library(dplyr)
+  readUrl <- function(url) {
+    out <- tryCatch(
+        {
+            read_html(paste(url, sep="")) %>% html_element(xpath='//*[(@id = "csvLink")]') %>% html_attr("href")
+        },
+        error=function(cond) {
+            return(NA)
+        },
+        warning=function(cond) {
+            return(NA)
+        },
+        finally={
+        }
+    )    
+    return(out)
+}
+  y=readUrl(paste('https://www.fpds.gov/ezsearch/fpdsportal?q=GLOBAL_VENDOR_NAME%3A"The+Boeing+Company"+CONTRACT_FISCAL_YEAR%3A%22',as.character(i),'%22&s=FPDS.GOV&templateName=1.5.2&indexName=awardfull&x=22&y=13',sep=""))
+  if (is.na(y)==FALSE) { year_x <- read.csv(paste("https://www.fpds.gov/ezsearch/fpdsportal",y, sep=""))
+  year_name <- paste("year",i, sep = "")
+  assign(year_name,year_x) }
+}
+```
+
+```{r}
+contracts2 <- foreach(i = 2000:2010, .combine = 'rbind') %dopar% {
+  library(rvest)
+  library(dplyr)
+  readUrl <- function(url) {
+    out <- tryCatch(
+        {
+            read_html(paste(url, sep="")) %>% html_element(xpath='//*[(@id = "csvLink")]') %>% html_attr("href")
+        },
+        error=function(cond) {
+            return(NA)
+        },
+        warning=function(cond) {
+            return(NA)
+        },
+        finally={
+        }
+    )    
+    return(out)
+}
+  y=readUrl(paste('https://www.fpds.gov/ezsearch/fpdsportal?q=GLOBAL_VENDOR_NAME%3A"The+Boeing+Company"+CONTRACT_FISCAL_YEAR%3A%22',as.character(i),'%22&s=FPDS.GOV&templateName=1.5.2&indexName=awardfull&x=22&y=13',sep=""))
+  if (is.na(y)==FALSE) { year_x <- read.csv(paste("https://www.fpds.gov/ezsearch/fpdsportal",y, sep=""))
+  year_name <- paste("year",i, sep = "")
+  assign(year_name,year_x) }
+}
+```
+
+```{r}
+contracts <- list()
+for (j in 1:1) { 
+df <- foreach(i = 1962+((j-1)*5):1966+((j-1)*5), .combine = 'rbind') %dopar% {
+  library(rvest)
+  library(dplyr)
+  readUrl <- function(url) {
+    out <- tryCatch(
+        {
+            read_html(paste(url, sep="")) %>% html_element(xpath='//*[(@id = "csvLink")]') %>% html_attr("href")
+        },
+        error=function(cond) {
+            return(NA)
+        },
+        warning=function(cond) {
+            return(NA)
+        },
+        finally={
+        }
+    )    
+    return(out)
+}
+  y=readUrl(paste('https://www.fpds.gov/ezsearch/fpdsportal?q=GLOBAL_VENDOR_NAME%3A"The+Boeing+Company"+CONTRACT_FISCAL_YEAR%3A%22',as.character(i),'%22&s=FPDS.GOV&templateName=1.5.2&indexName=awardfull&x=22&y=13',sep=""))
+  if (is.na(y)==FALSE) { year_x <- read.csv(paste("https://www.fpds.gov/ezsearch/fpdsportal",y, sep=""))
+  year_name <- paste("year",i, sep = "")
+  assign(year_name,year_x) }
+}
+contracts[[i]] <-df
+}
+```
+
+```{r}
+contracts3 <- foreach(i = 2008:2012, .combine = 'rbind') %dopar% {
+  library(rvest)
+  library(dplyr)
+  y=read_html(paste('https://www.fpds.gov/ezsearch/fpdsportal?indexName=awardfull&templateName=1.5.2&s=FPDS.GOV&q=VENDOR_FULL_NAME%3A%22LOCKHEED+MARTIN+CORPORATION%22+CONTRACT_FISCAL_YEAR%3A%22',as.character(i),'%22&x=0&y=0', sep="")) %>% html_element(xpath='//*[(@id = "csvLink")]') %>% html_attr("href")
+   if (is.na(y)==FALSE) { year_x <- read.csv(paste("https://www.fpds.gov/ezsearch/fpdsportal",y, sep=""))
+  year_name <- paste("year",i, sep = "")
+  assign(year_name,year_x) }
+}
+```
+
 ```{r}
 parallel::stopCluster(cl = my.cluster)
 ```
