@@ -176,6 +176,117 @@ contracts2 <- foreach(i = 2000:2010, .combine = 'rbind') %dopar% {
 ```
 
 ```{r}
+contracts3 <- foreach(i = 2011:2015, .combine = 'rbind') %dopar% {
+  library(rvest)
+  library(dplyr)
+  readUrl <- function(url) {
+    out <- tryCatch(
+        {
+            read_html(paste(url, sep="")) %>% html_element(xpath='//*[(@id = "csvLink")]') %>% html_attr("href")
+        },
+        error=function(cond) {
+            return(NA)
+        },
+        warning=function(cond) {
+            return(NA)
+        },
+        finally={
+        }
+    )    
+    return(out)
+}
+  y=readUrl(paste('https://www.fpds.gov/ezsearch/fpdsportal?q=GLOBAL_VENDOR_NAME%3A"The+Boeing+Company"+CONTRACT_FISCAL_YEAR%3A%22',as.character(i),'%22&s=FPDS.GOV&templateName=1.5.2&indexName=awardfull&x=22&y=13',sep=""))
+  if (is.na(y)==FALSE) { year_x <- read.csv(paste("https://www.fpds.gov/ezsearch/fpdsportal",y, sep=""))
+  year_name <- paste("year",i, sep = "")
+  assign(year_name,year_x) }
+}
+```
+
+```{r}
+contracts4 <- foreach(i = 2016:2018, .combine = 'rbind') %dopar% {
+  library(rvest)
+  library(dplyr)
+  readUrl <- function(url) {
+    out <- tryCatch(
+        {
+            read_html(paste(url, sep="")) %>% html_element(xpath='//*[(@id = "csvLink")]') %>% html_attr("href")
+        },
+        error=function(cond) {
+            return(NA)
+        },
+        warning=function(cond) {
+            return(NA)
+        },
+        finally={
+        }
+    )    
+    return(out)
+}
+  y=readUrl(paste('https://www.fpds.gov/ezsearch/fpdsportal?q=GLOBAL_VENDOR_NAME%3A"The+Boeing+Company"+CONTRACT_FISCAL_YEAR%3A%22',as.character(i),'%22&s=FPDS.GOV&templateName=1.5.2&indexName=awardfull&x=22&y=13',sep=""))
+  if (is.na(y)==FALSE) { year_x <- read.csv(paste("https://www.fpds.gov/ezsearch/fpdsportal",y, sep=""))
+  year_name <- paste("year",i, sep = "")
+  assign(year_name,year_x) }
+}
+```
+
+```{r}
+contracts5 <- foreach(i = 2019:2020, .combine = 'rbind') %dopar% {
+  library(rvest)
+  library(dplyr)
+  readUrl <- function(url) {
+    out <- tryCatch(
+        {
+            read_html(paste(url, sep="")) %>% html_element(xpath='//*[(@id = "csvLink")]') %>% html_attr("href")
+        },
+        error=function(cond) {
+            return(NA)
+        },
+        warning=function(cond) {
+            return(NA)
+        },
+        finally={
+        }
+    )    
+    return(out)
+}
+  y=readUrl(paste('https://www.fpds.gov/ezsearch/fpdsportal?q=GLOBAL_VENDOR_NAME%3A"The+Boeing+Company"+CONTRACT_FISCAL_YEAR%3A%22',as.character(i),'%22&s=FPDS.GOV&templateName=1.5.2&indexName=awardfull&x=22&y=13',sep=""))
+  if (is.na(y)==FALSE) { year_x <- read.csv(paste("https://www.fpds.gov/ezsearch/fpdsportal",y, sep=""))
+  year_name <- paste("year",i, sep = "")
+  assign(year_name,year_x) }
+}
+```
+```{r}
+contracts6 <- foreach(i = 2021:2022, .combine = 'rbind') %dopar% {
+  library(rvest)
+  library(dplyr)
+  readUrl <- function(url) {
+    out <- tryCatch(
+        {
+            read_html(paste(url, sep="")) %>% html_element(xpath='//*[(@id = "csvLink")]') %>% html_attr("href")
+        },
+        error=function(cond) {
+            return(NA)
+        },
+        warning=function(cond) {
+            return(NA)
+        },
+        finally={
+        }
+    )    
+    return(out)
+}
+  y=readUrl(paste('https://www.fpds.gov/ezsearch/fpdsportal?q=GLOBAL_VENDOR_NAME%3A"The+Boeing+Company"+CONTRACT_FISCAL_YEAR%3A%22',as.character(i),'%22&s=FPDS.GOV&templateName=1.5.2&indexName=awardfull&x=22&y=13',sep=""))
+  if (is.na(y)==FALSE) { year_x <- read.csv(paste("https://www.fpds.gov/ezsearch/fpdsportal",y, sep=""))
+  year_name <- paste("year",i, sep = "")
+  assign(year_name,year_x) }
+}
+```
+
+```{r}
+boeing<-rbind(contracts1, contracts2, contracts3, contracts4, contracts5, contracts6)
+```
+
+```{r}
 contracts <- list()
 for (j in 1:1) { 
 df <- foreach(i = 1962+((j-1)*5):1966+((j-1)*5), .combine = 'rbind') %dopar% {
@@ -223,5 +334,9 @@ parallel::stopCluster(cl = my.cluster)
 
 ```{r}
 write.csv(contracts, "raytheonContracts.csv")
+```
+
+```{r}
+write.csv(boeing, "boeingContracts.csv")
 ```
 

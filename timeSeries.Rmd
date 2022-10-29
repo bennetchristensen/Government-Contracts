@@ -18,7 +18,7 @@ library(stringr)
 stocks <-read.csv("RTX.csv")
 contracts <- read.csv("raytheonContracts.csv")
 house <- read.csv("house.csv")
-96th (1979–1981)
+
 ```
 ```{r}
 house <- house %>%

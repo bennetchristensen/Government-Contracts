@@ -1,0 +1,87 @@
+---
+title: "Untitled"
+author: "Ben Christensen"
+date: "2022-10-27"
+output: html_document
+---
+
+
+
+```{r}
+library(tidyverse)
+library(tidycensus)
+library(sf)
+library(ggplot2)
+```
+
+```{r}
+raytheon <- read.csv("raytheonContracts.csv")
+boeing <- read.csv("boeingContracts.csv")
+cont <- rbind(raytheon, boeing)
+```
+
+```{r}
+cont1 <- cont %>%
+  filter(nchar(Entity.ZIP.Code)==4) %>%
+  mutate(zip = paste0("0",Entity.ZIP.Code))
+```
+```{r}
+cont2 <- cont %>%
+  filter(nchar(Entity.ZIP.Code)>5) %>%
+  mutate(zip = as.character(Entity.ZIP.Code))
+```
+```{r}
+cont3 <- cont %>%
+  filter(nchar(Entity.ZIP.Code)==5) %>%
+  mutate(zip = as.character(Entity.ZIP.Code)) %>%
+  mutate(zip = substr(zip,1,5))
+```
+
+```{r}
+contzip <- rbind()
+```
+
+
+```{r}
+cont<-cont %>% 
+  add_count(Entity.ZIP.Code) %>%
+  mutate(actionObligation = str_replace_all(Action.Obligation....,"\\$", ""), actionObligation = as.numeric(str_replace_all(actionObligation,",", ""))) %>%
+  group_by(Entity.ZIP.Code) %>%
+  mutate(sum = sum(actionObligation))
+
+```
+```{r}
+unique <- cont %>% distinct(Entity.ZIP.Code, n, sum, Ultimate.Parent.Legal.Business.Name)
+```
+
+
+
+
+```{r}
+zip <- st_read("tl_2010_us_zcta510")
+```
+```{r}
+merge <- merge(zip, unique, by.x = "ZCTA5CE10", by.y = "Entity.ZIP.Code")
+```
+```{r}
+usa <- st_as_sf(maps::map("state", fill=TRUE, plot =FALSE))
+md <- st_as_sf(maps::map("state", c("maryland", "dc", "virginia"), fill=TRUE, plot =FALSE))
+ca <- st_as_sf(maps::map("state", "california", fill=TRUE, plot =FALSE))
+```
+```{r}
+st_bbox(ca)
+md_sub <- st_crop(merge, xmin = -83.64611, ymin =36.53752, xmax=-75.05746, ymax =39.73462 )
+ca_sub <- st_crop(merge, xmin=-124.38342, ymin=32.53827, xmax = -114.13319, ymax= 42.0207 )
+```
+```{r}
+ggplot() + geom_sf(data=usa)+ geom_sf(aes(size= sum), data=merge, color="red") 
+```
+
+```{r}
+ggplot() + geom_sf(data=md)+ geom_sf(data=md_sub, color="red") +  geom_sf(aes(size=sum), color = NA, data=md_sub)
+
+```
+```{r}
+ggplot() + geom_sf(data=ca)+ geom_sf(data=ca_sub, color="red") +  geom_sf(aes(size=sum), color = NA, data=ca_sub)
+```
+
