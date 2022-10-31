@@ -15,8 +15,10 @@ library(ggplot2)
 ```
 
 ```{r}
-raytheon <- read.csv("raytheonContracts.csv")
-boeing <- read.csv("boeingContracts.csv")
+raytheon <- read.csv("raytheonContracts.csv") %>%
+  mutate(company = "raytheon")
+boeing <- read.csv("boeingContracts.csv") %>%
+  mutate(company = "boeing")
 cont <- rbind(raytheon, boeing)
 ```
 
@@ -28,30 +30,31 @@ cont1 <- cont %>%
 ```{r}
 cont2 <- cont %>%
   filter(nchar(Entity.ZIP.Code)>5) %>%
-  mutate(zip = as.character(Entity.ZIP.Code))
+  mutate(zip = as.character(Entity.ZIP.Code)) %>%
+  mutate(zip = substr(zip,1,5))
 ```
 ```{r}
 cont3 <- cont %>%
   filter(nchar(Entity.ZIP.Code)==5) %>%
-  mutate(zip = as.character(Entity.ZIP.Code)) %>%
-  mutate(zip = substr(zip,1,5))
+  mutate(zip = as.character(Entity.ZIP.Code))
+  
 ```
 
 ```{r}
-contzip <- rbind()
+contzip <- rbind(cont1, cont2, cont3)
 ```
 
 
 ```{r}
-cont<-cont %>% 
-  add_count(Entity.ZIP.Code) %>%
+contzip<-contzip %>% 
+  add_count(zip) %>%
   mutate(actionObligation = str_replace_all(Action.Obligation....,"\\$", ""), actionObligation = as.numeric(str_replace_all(actionObligation,",", ""))) %>%
-  group_by(Entity.ZIP.Code) %>%
+  group_by(zip,company) %>%
   mutate(sum = sum(actionObligation))
 
 ```
 ```{r}
-unique <- cont %>% distinct(Entity.ZIP.Code, n, sum, Ultimate.Parent.Legal.Business.Name)
+unique <- contzip %>% distinct(zip, n, sum, company)
 ```
 
 
@@ -61,7 +64,7 @@ unique <- cont %>% distinct(Entity.ZIP.Code, n, sum, Ultimate.Parent.Legal.Busin
 zip <- st_read("tl_2010_us_zcta510")
 ```
 ```{r}
-merge <- merge(zip, unique, by.x = "ZCTA5CE10", by.y = "Entity.ZIP.Code")
+merge <- merge(zip, unique, by.x = "ZCTA5CE10", by.y = "zip")
 ```
 ```{r}
 usa <- st_as_sf(maps::map("state", fill=TRUE, plot =FALSE))
@@ -69,16 +72,30 @@ md <- st_as_sf(maps::map("state", c("maryland", "dc", "virginia"), fill=TRUE, pl
 ca <- st_as_sf(maps::map("state", "california", fill=TRUE, plot =FALSE))
 ```
 ```{r}
-st_bbox(ca)
+usa_sub <- st_crop(merge, xmin = -124.68134, ymin = 25.12993, xmax =-67.00742, ymax = 49.38323)
 md_sub <- st_crop(merge, xmin = -83.64611, ymin =36.53752, xmax=-75.05746, ymax =39.73462 )
 ca_sub <- st_crop(merge, xmin=-124.38342, ymin=32.53827, xmax = -114.13319, ymax= 42.0207 )
 ```
 ```{r}
-ggplot() + geom_sf(data=usa)+ geom_sf(aes(size= sum), data=merge, color="red") 
+
+ggplot() + geom_sf(data=usa)+ geom_sf(aes(size= sum, color = company), data=usa_sub) + theme(axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid.major = element_line('transparent'),
+        panel.background = element_blank(),
+        strip.text.x  = element_text(color='black', size = 20, face = 'bold', hjust=.5),
+        plot.title = element_text(color='black', size = 20, face = 'bold', hjust=.5),
+        plot.subtitle = element_text(color='black', size = 12, face = 'bold', hjust=.5),
+        legend.key.width = unit(.4, 'in'),
+        legend.title = element_text(color='black', size = 12, face='bold', vjust=.5, hjust=.5), 
+        legend.position = "bottom",
+        legend.direction='horizontal',
+        legend.text = element_text(color='black', size = 12, face='bold'))+
+    guides(fill = guide_colourbar(title = 'Company', 
+                                  title.position='top', title.hjust =.5))
 ```
 
 ```{r}
-ggplot() + geom_sf(data=md)+ geom_sf(data=md_sub, color="red") +  geom_sf(aes(size=sum), color = NA, data=md_sub)
+ggplot() + geom_sf(data=md)+ geom_sf(data=md_sub, color="red") +   geom_sf(aes(size= sum, color = company), data=md_sub)
 
 ```
 ```{r}
