@@ -328,6 +328,34 @@ contracts3 <- foreach(i = 2008:2012, .combine = 'rbind') %dopar% {
 }
 ```
 
+
+```{r}
+lockheed1 <- foreach(i = 1995:2010, .combine = 'rbind') %dopar% {
+  library(rvest)
+  library(dplyr)
+  readUrl <- function(url) {
+    out <- tryCatch(
+        {
+            read_html(paste(url, sep="")) %>% html_element(xpath='//*[(@id = "csvLink")]') %>% html_attr("href")
+        },
+        error=function(cond) {
+            return(NA)
+        },
+        warning=function(cond) {
+            return(NA)
+        },
+        finally={
+        }
+    )    
+    return(out)
+}
+  y=readUrl(paste('https://www.fpds.gov/ezsearch/fpdsportal?q=GLOBAL_VENDOR_NAME%3A"LOCKHEED+MARTIN+CORPORATION"+CONTRACT_FISCAL_YEAR%3A%22',as.character(i),'%22&s=FPDS.GOV&templateName=1.5.2&indexName=awardfull&x=22&y=13',sep=""))
+  if (is.na(y)==FALSE) { year_x <- read.csv(paste("https://www.fpds.gov/ezsearch/fpdsportal",y, sep=""))
+  year_name <- paste("year",i, sep = "")
+  assign(year_name,year_x) }
+}
+```
+
 ```{r}
 parallel::stopCluster(cl = my.cluster)
 ```

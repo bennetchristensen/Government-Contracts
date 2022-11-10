@@ -1,0 +1,53 @@
+---
+title: "datacleanzip"
+author: "Ben Christensen"
+date: "2022-11-10"
+output: html_document
+---
+
+```{r}
+library(tidycensus)
+library(tidyverse)
+library(lubridate)
+library(janitor)
+library(sf)
+library(foreign)
+```
+
+```{r}
+census_api_key("5e859f7dad63d8212a79156c9ac5a920566df5e0")
+```
+```{r}
+v17 <- load_variables(2017, "acs5", cache = TRUE)
+```
+
+```{r}
+zip_data_2020 <- get_acs(
+        geography = "zcta", 
+        variables = c(english = "B16004_001",
+                      total_pop1 = "B01003_001",
+                      male = "B01001_002",
+                      age = "B01002_001",
+                      gini = "B19083_001",
+                      med_income = "B06011_001", 
+                      food_stamps = "B07012_001",
+                      latinx = "B03001_003", 
+                      white = "B02001_002", 
+                      black = "B02001_003", 
+                      asian = "B02001_005",
+                      native = "B02001_004",
+                      immigrant = "B05012_003",
+                      highschool = "B15002_011",
+                      median_rent = "B25064_001"),
+        year = 2020,
+        output = "wide",
+        survey = "acs5",
+        geometry = FALSE) %>% 
+  dplyr::select(-c(NAME, ends_with("M"))) %>%
+  rename_at(vars(ends_with("E")), .funs = list(~str_sub(., end = -2)))
+```
+
+
+```{r}
+write.csv(zip_data_2020, "zip2020.csv")
+```

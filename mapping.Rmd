@@ -21,6 +21,27 @@ boeing <- read.csv("boeingContracts.csv") %>%
   mutate(company = "boeing")
 cont <- rbind(raytheon, boeing)
 ```
+```{r}
+zip <- read.csv("zip2020.csv")
+```
+
+```{r}
+zip1 <- zip %>%
+  filter(nchar(GEOID) == 3) %>%
+  mutate(zip = paste0("00",GEOID))
+zip2 <- zip %>%
+  filter(nchar(GEOID) ==4) %>%
+  mutate(zip = paste0("0",GEOID))
+zip3 <- zip %>%
+  filter(nchar(GEOID) ==5) %>%
+  mutate(zip = as.character(GEOID))
+zipfix <- rbind(zip1,zip2,zip3)
+```
+```{r}
+cont1 <- cont %>%
+  filter(nchar(Entity.ZIP.Code)==4) %>%
+  mutate(zip = paste0("0",Entity.ZIP.Code))
+```
 
 ```{r}
 cont1 <- cont %>%
@@ -57,6 +78,9 @@ contzip<-contzip %>%
 unique <- contzip %>% distinct(zip, n, sum, company)
 ```
 
+```{r}
+unique2 <- left_join(unique, zipfix,by=c("zip" = "zip"))
+```
 
 
 
@@ -64,7 +88,7 @@ unique <- contzip %>% distinct(zip, n, sum, company)
 zip <- st_read("tl_2010_us_zcta510")
 ```
 ```{r}
-merge <- merge(zip, unique, by.x = "ZCTA5CE10", by.y = "zip")
+merge <- merge(zip, unique2, by.x = "ZCTA5CE10", by.y = "zip")
 ```
 ```{r}
 usa <- st_as_sf(maps::map("state", fill=TRUE, plot =FALSE))
@@ -95,10 +119,27 @@ ggplot() + geom_sf(data=usa)+ geom_sf(aes(size= sum, color = company), data=usa_
 ```
 
 ```{r}
-ggplot() + geom_sf(data=md)+ geom_sf(data=md_sub, color="red") +   geom_sf(aes(size= sum, color = company), data=md_sub)
+ggplot() + geom_sf(data=md)+ geom_sf(data=md_sub, color="red") + geom_sf(aes(size= sum, color = company), data=md_sub)
 
 ```
 ```{r}
 ggplot() + geom_sf(data=ca)+ geom_sf(data=ca_sub, color="red") +  geom_sf(aes(size=sum), color = NA, data=ca_sub)
+```
+```{r}
+unique2 <- unique2 %>%
+  mutate(logsum = log(sum+1), loginc = log(med_income), percwhite = white/total_pop1)
+```
+
+
+```{r}
+unique2 %>%
+  ggplot(aes(y = logsum, x = percwhite)) +
+  geom_point()
+```
+
+```{r}
+
+mod1 <- lm(logsum ~ percwhite, data = unique2)
+summary(mod1)
 ```
 
