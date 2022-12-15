@@ -15,15 +15,26 @@ library(ggplot2)
 ```
 
 ```{r}
-raytheon <- read.csv("raytheonContracts.csv") %>%
-  mutate(company = "raytheon")
-boeing <- read.csv("boeingContracts.csv") %>%
-  mutate(company = "boeing")
-cont <- rbind(raytheon, boeing)
+raytheon <- read.csv("raytheonMD.csv") %>%
+  mutate(company = "Raytheon")
+boeing <- read.csv("boeingMD.csv") %>%
+  mutate(company = "Boeing")
+general <- read.csv("generaldynamicsMD.csv") %>%
+  mutate(company = "General Dynamics")
+grumman <- read.csv("grummanMD.csv") %>%
+  mutate(company = "Northrop Grumman")
+lockheed <- read.csv("lockheedMD.csv") %>%
+  mutate(company = "Lockheed Martin")
+cont <- rbind(raytheon, boeing, general, grumman, lockheed)
 ```
 ```{r}
 zip <- read.csv("zip2020.csv")
 ```
+
+```{r}
+md_zip <- read.csv("Zip_Code_Lookup_Table.csv")
+```
+
 
 ```{r}
 zip1 <- zip %>%
@@ -65,7 +76,6 @@ cont3 <- cont %>%
 contzip <- rbind(cont1, cont2, cont3)
 ```
 
-
 ```{r}
 contzip<-contzip %>% 
   add_count(zip) %>%
@@ -88,21 +98,43 @@ unique2 <- left_join(unique, zipfix,by=c("zip" = "zip"))
 zip <- st_read("tl_2010_us_zcta510")
 ```
 ```{r}
-merge <- merge(zip, unique2, by.x = "ZCTA5CE10", by.y = "zip")
+md_zip_full <- merge(md_zip, zip, by.x="Zip.Code", by.y ="ZCTA5CE10")
 ```
+
+```{r}
+MD_Merge <- left_join(md_zip_full, unique,by=c("GEOID10" = "zip"))
+Merge <- left_join(MD_Merge, zipfix, by= c("GEOID10" = "zip"))
+```
+```{r}
+Merge <- Merge %>% mutate(company = replace_na(company, "None"))
+```
+
 ```{r}
 usa <- st_as_sf(maps::map("state", fill=TRUE, plot =FALSE))
-md <- st_as_sf(maps::map("state", c("maryland", "dc", "virginia"), fill=TRUE, plot =FALSE))
+md <- st_as_sf(maps::map("state", "maryland", fill=TRUE, plot =FALSE))
 ca <- st_as_sf(maps::map("state", "california", fill=TRUE, plot =FALSE))
 ```
-```{r}
-usa_sub <- st_crop(merge, xmin = -124.68134, ymin = 25.12993, xmax =-67.00742, ymax = 49.38323)
-md_sub <- st_crop(merge, xmin = -83.64611, ymin =36.53752, xmax=-75.05746, ymax =39.73462 )
-ca_sub <- st_crop(merge, xmin=-124.38342, ymin=32.53827, xmax = -114.13319, ymax= 42.0207 )
-```
+
 ```{r}
 
-ggplot() + geom_sf(data=usa)+ geom_sf(aes(size= sum, color = company), data=usa_sub) + theme(axis.text = element_blank(),
+#ggplot() + geom_sf(data=usa)+ geom_sf(aes(size= sum, color = company), data=usa_sub) + theme(axis.text = element_blank(),
+        #axis.ticks = element_blank(),
+        #panel.grid.major = element_line('transparent'),
+        #panel.background = element_blank(),
+        #strip.text.x  = element_text(color='black', size = 20, face = 'bold', hjust=.5),
+        #plot.title = element_text(color='black', size = 20, face = 'bold', hjust=.5),
+        #plot.subtitle = element_text(color='black', size = 12, face = 'bold', hjust=.5),
+        #legend.key.width = unit(.4, 'in'),
+        #legend.title = element_text(color='black', size = 12, face='bold', vjust=.5, hjust=.5), 
+        #legend.position = "bottom",
+        #legend.direction='horizontal',
+        #legend.text = element_text(color='black', size = 12, face='bold'))+
+    #guides(fill = guide_colourbar(title = 'Company', 
+#                                  title.position='top', title.hjust =.5))
+```
+
+```{r}
+ggplot() + geom_sf(aes( fill= company, geometry=geometry), data=Merge) + theme(axis.text = element_blank(),
         axis.ticks = element_blank(),
         panel.grid.major = element_line('transparent'),
         panel.background = element_blank(),
@@ -114,32 +146,83 @@ ggplot() + geom_sf(data=usa)+ geom_sf(aes(size= sum, color = company), data=usa_
         legend.position = "bottom",
         legend.direction='horizontal',
         legend.text = element_text(color='black', size = 12, face='bold'))+
-    guides(fill = guide_colourbar(title = 'Company', 
+    guides(fill = guide_legend(title = 'Company', 
                                   title.position='top', title.hjust =.5))
 ```
 
-```{r}
-ggplot() + geom_sf(data=md)+ geom_sf(data=md_sub, color="red") + geom_sf(aes(size= sum, color = company), data=md_sub)
-
-```
-```{r}
-ggplot() + geom_sf(data=ca)+ geom_sf(data=ca_sub, color="red") +  geom_sf(aes(size=sum), color = NA, data=ca_sub)
-```
-```{r}
-unique2 <- unique2 %>%
-  mutate(logsum = log(sum+1), loginc = log(med_income), percwhite = white/total_pop1)
-```
-
 
 ```{r}
-unique2 %>%
-  ggplot(aes(y = logsum, x = percwhite)) +
-  geom_point()
+column_names <- c("Maryland", "All Companies", "Lockheed Martin", "Northrop Grumman", "Raytheon", "Boeing", "General Dynamics" )
+
+`Median Income` <- c("$44,669","$47,944","$52,301","$48,413","$47,364","$42,439","$44,988")
+`Average Age` <- c(39.24, 38.15,38.40,38.41381, 38.59,36.10,37.84)
+`Average Population per ZIP code` <- c("13,655.78", "29,395.89",  "36,857.92", "26,639.96", "24,867.79","34,512.5","30,149.81")
+`Percent White` <- c("48.7%","50.51%", "45.68%", "52.64%","47.02%","32.16%","54.94%")
+
+rbind(`Median Income`, `Average Age`,`Average Population per ZIP code`,`Percent White`) %>% 
+  kableExtra::kable(align="c", caption = "Demogrpahics of Zip Codes of Defense Contractor Offices", col.names = column_names) %>%
+  kableExtra::kable_styling(latex_options = c("hold_position"))
+
 ```
 
 ```{r}
-
-mod1 <- lm(logsum ~ percwhite, data = unique2)
-summary(mod1)
+weighted.mean(Merge$age,Merge$total_pop1, na.rm=TRUE)
+mean(Merge$total_pop1, na.rm=TRUE)
+weighted.mean(Merge$med_income,Merge$total_pop1/1000, na.rm=TRUE)
+```
+```{r}
+companyonly <- Merge %>% filter(company!="None")
+companyonly <- companyonly %>% mutate(whiteavg = white/total_pop1)
+companyonly <- companyonly %>% mutate(whiteavg = replace_na(whiteavg, 0))
+weighted.mean(companyonly$age,companyonly$total_pop1, na.rm=TRUE)
+mean(companyonly$total_pop1, na.rm=TRUE)
+weighted.mean(companyonly$med_income,companyonly$total_pop1/1000, na.rm=TRUE)
+weighted.mean(companyonly$whiteavg,  na.rm=TRUE)
 ```
 
+```{r}
+companyonly <- Merge %>% filter(company=="Lockheed Martin")
+companyonly <- companyonly %>% mutate(whiteavg = white/total_pop1)
+companyonly <- companyonly %>% mutate(whiteavg = replace_na(whiteavg, 0))
+weighted.mean(companyonly$age,companyonly$total_pop1, na.rm=TRUE)
+mean(companyonly$total_pop1, na.rm=TRUE)
+weighted.mean(companyonly$med_income,companyonly$total_pop1/1000, na.rm=TRUE)
+weighted.mean(companyonly$whiteavg, companyonly$total_pop1/1000, na.rm=TRUE)
+```
+```{r}
+companyonly <- Merge %>% filter(company=="Northrop Grumman")
+companyonly <- companyonly %>% mutate(whiteavg = white/total_pop1)
+companyonly <- companyonly %>% mutate(whiteavg = replace_na(whiteavg, 0))
+weighted.mean(companyonly$age,companyonly$total_pop1, na.rm=TRUE)
+mean(companyonly$total_pop1, na.rm=TRUE)
+weighted.mean(companyonly$med_income,companyonly$total_pop1/1000, na.rm=TRUE)
+weighted.mean(companyonly$whiteavg, companyonly$total_pop1/1000, na.rm=TRUE)
+```
+```{r}
+companyonly <- Merge %>% filter(company=="Raytheon")
+companyonly <- companyonly %>% mutate(whiteavg = white/total_pop1)
+companyonly <- companyonly %>% mutate(whiteavg = replace_na(whiteavg, 0))
+weighted.mean(companyonly$age,companyonly$total_pop1, na.rm=TRUE)
+mean(companyonly$total_pop1, na.rm=TRUE)
+weighted.mean(companyonly$med_income,companyonly$total_pop1/1000, na.rm=TRUE)
+weighted.mean(companyonly$whiteavg, companyonly$total_pop1/1000, na.rm=TRUE)
+```
+
+```{r}
+companyonly <- Merge %>% filter(company=="Boeing")
+companyonly <- companyonly %>% mutate(whiteavg = white/total_pop1)
+companyonly <- companyonly %>% mutate(whiteavg = replace_na(whiteavg, 0))
+weighted.mean(companyonly$age,companyonly$total_pop1, na.rm=TRUE)
+mean(companyonly$total_pop1, na.rm=TRUE)
+weighted.mean(companyonly$med_income,companyonly$total_pop1/1000, na.rm=TRUE)
+weighted.mean(companyonly$whiteavg, companyonly$total_pop1/1000, na.rm=TRUE)
+```
+```{r}
+companyonly <- Merge %>% filter(company=="General Dynamics")
+companyonly <- companyonly %>% mutate(whiteavg = white/total_pop1)
+companyonly <- companyonly %>% mutate(whiteavg = replace_na(whiteavg, 0))
+weighted.mean(companyonly$age,companyonly$total_pop1, na.rm=TRUE)
+mean(companyonly$total_pop1, na.rm=TRUE)
+weighted.mean(companyonly$med_income,companyonly$total_pop1/1000, na.rm=TRUE)
+weighted.mean(companyonly$whiteavg, companyonly$total_pop1/1000, na.rm=TRUE)
+```
