@@ -1,20 +1,20 @@
 ---
-title: "Untitled"
+title: "Defense Contractors in Maryland"
 author: "Ben Christensen"
-date: "2022-10-27"
+date: "Fall 2022"
 output: html_document
 ---
 
 
 
-```{r}
+```{r, include=FALSE}
 library(tidyverse)
 library(tidycensus)
 library(sf)
 library(ggplot2)
 ```
 
-```{r}
+```{r, include=FALSE}
 raytheon <- read.csv("raytheonMD.csv") %>%
   mutate(company = "Raytheon")
 boeing <- read.csv("boeingMD.csv") %>%
@@ -27,16 +27,16 @@ lockheed <- read.csv("lockheedMD.csv") %>%
   mutate(company = "Lockheed Martin")
 cont <- rbind(raytheon, boeing, general, grumman, lockheed)
 ```
-```{r}
+```{r, include=FALSE}
 zip <- read.csv("zip2020.csv")
 ```
 
-```{r}
+```{r, include=FALSE}
 md_zip <- read.csv("Zip_Code_Lookup_Table.csv")
 ```
 
 
-```{r}
+```{r, include=FALSE}
 zip1 <- zip %>%
   filter(nchar(GEOID) == 3) %>%
   mutate(zip = paste0("00",GEOID))
@@ -48,35 +48,35 @@ zip3 <- zip %>%
   mutate(zip = as.character(GEOID))
 zipfix <- rbind(zip1,zip2,zip3)
 ```
-```{r}
+```{r, include=FALSE}
 cont1 <- cont %>%
   filter(nchar(Entity.ZIP.Code)==4) %>%
   mutate(zip = paste0("0",Entity.ZIP.Code))
 ```
 
-```{r}
+```{r, include=FALSE}
 cont1 <- cont %>%
   filter(nchar(Entity.ZIP.Code)==4) %>%
   mutate(zip = paste0("0",Entity.ZIP.Code))
 ```
-```{r}
+```{r, include=FALSE}
 cont2 <- cont %>%
   filter(nchar(Entity.ZIP.Code)>5) %>%
   mutate(zip = as.character(Entity.ZIP.Code)) %>%
   mutate(zip = substr(zip,1,5))
 ```
-```{r}
+```{r, include=FALSE}
 cont3 <- cont %>%
   filter(nchar(Entity.ZIP.Code)==5) %>%
   mutate(zip = as.character(Entity.ZIP.Code))
   
 ```
 
-```{r}
+```{r, include=FALSE}
 contzip <- rbind(cont1, cont2, cont3)
 ```
 
-```{r}
+```{r, include=FALSE}
 contzip<-contzip %>% 
   add_count(zip) %>%
   mutate(actionObligation = str_replace_all(Action.Obligation....,"\\$", ""), actionObligation = as.numeric(str_replace_all(actionObligation,",", ""))) %>%
@@ -84,38 +84,38 @@ contzip<-contzip %>%
   mutate(sum = sum(actionObligation))
 
 ```
-```{r}
+```{r, include=FALSE}
 unique <- contzip %>% distinct(zip, n, sum, company)
 ```
 
-```{r}
+```{r, include=FALSE}
 unique2 <- left_join(unique, zipfix,by=c("zip" = "zip"))
 ```
 
 
 
-```{r}
+```{r, include=FALSE}
 zip <- st_read("tl_2010_us_zcta510")
 ```
-```{r}
+```{r, include=FALSE}
 md_zip_full <- merge(md_zip, zip, by.x="Zip.Code", by.y ="ZCTA5CE10")
 ```
 
-```{r}
+```{r, include=FALSE}
 MD_Merge <- left_join(md_zip_full, unique,by=c("GEOID10" = "zip"))
 Merge <- left_join(MD_Merge, zipfix, by= c("GEOID10" = "zip"))
 ```
-```{r}
+```{r, include =FALSE}
 Merge <- Merge %>% mutate(company = replace_na(company, "None"))
 ```
 
-```{r}
+```{r, include = FALSE}
 usa <- st_as_sf(maps::map("state", fill=TRUE, plot =FALSE))
 md <- st_as_sf(maps::map("state", "maryland", fill=TRUE, plot =FALSE))
 ca <- st_as_sf(maps::map("state", "california", fill=TRUE, plot =FALSE))
 ```
 
-```{r}
+```{r, include = FALSE}
 
 #ggplot() + geom_sf(data=usa)+ geom_sf(aes(size= sum, color = company), data=usa_sub) + theme(axis.text = element_blank(),
         #axis.ticks = element_blank(),
@@ -133,7 +133,7 @@ ca <- st_as_sf(maps::map("state", "california", fill=TRUE, plot =FALSE))
 #                                  title.position='top', title.hjust =.5))
 ```
 
-```{r}
+```{r, echo=FALSE}
 ggplot() + geom_sf(aes( fill= company, geometry=geometry), data=Merge) + theme(axis.text = element_blank(),
         axis.ticks = element_blank(),
         panel.grid.major = element_line('transparent'),
@@ -147,30 +147,44 @@ ggplot() + geom_sf(aes( fill= company, geometry=geometry), data=Merge) + theme(a
         legend.direction='horizontal',
         legend.text = element_text(color='black', size = 12, face='bold'))+
     guides(fill = guide_legend(title = 'Company', 
-                                  title.position='top', title.hjust =.5))
+                                  title.position='top', title.hjust =.5)) +
+  scale_fill_manual(values = c(None="#F8FFFE",Raytheon="#D62828", `Lockheed Martin`="#003049", `Northrop Grumman`="#F77F00", `General Dynamics`="#FCBF49", `Boeing`="#3CAEA3"))
 ```
 
 
-```{r}
-column_names <- c("Maryland", "All Companies", "Lockheed Martin", "Northrop Grumman", "Raytheon", "Boeing", "General Dynamics" )
+Due to its proximity to D.C. and its connection to the US Navy through Annapolis,
+Maryland is a hotspot for the military industrial complex. Of the 468 zip codes in Maryland, 74
+contain locations belonging to the five largest defense contractors. We can visually see that most of these zip codes are around DC and Baltimore, with Delmarva and Western Maryland being devoid of defence contractor locations. Of the five, Lockheed Martin is
+headquartered in Maryland, while Northrop Grumman, Raytheon, Boeing, and General
+Dynamics are all headquartered in the neighboring state of Virginia. When looking at the
+demographics of the ZIP codes of these offices, they tend to be located in slightly richer,
+younger, more populated, and more white areas. Interestingly, while true for most of the
+companies, the opposite is true for Boeing.
 
-`Median Income` <- c("$44,669","$47,944","$52,301","$48,413","$47,364","$42,439","$44,988")
-`Average Age` <- c(39.24, 38.15,38.40,38.41381, 38.59,36.10,37.84)
-`Average Population per ZIP code` <- c("13,655.78", "29,395.89",  "36,857.92", "26,639.96", "24,867.79","34,512.5","30,149.81")
-`Percent White` <- c("48.7%","50.51%", "45.68%", "52.64%","47.02%","32.16%","54.94%")
 
-rbind(`Median Income`, `Average Age`,`Average Population per ZIP code`,`Percent White`) %>% 
+```{r, echo = FALSE}
+column_names <- c("Median Income", "Average Age","Average Population per ZIP code","Percent White")
+
+`Maryland` <- c("$44,669","39.24","13,656","48.7%")
+`All Companies` <- c("$47,944","38.15","29,396","50.51%")
+`Lockheed Martin`<- c("$52,301", "38.40","36,858", "45.68%")
+`Northrop Grumman` <- c("$48,413","38.41","26,640","52.64%")
+`Raytheon` <- c("$47,364","38.59","24,868","47.02%")
+`Boeing`<- c("$42,439","36.10","34,513","32.16%")
+`General Dynamics` <- c("$44,988", "37.84", "30,150", "54.94%")
+
+rbind(`Maryland`, `All Companies`, `Lockheed Martin`, `Northrop Grumman`, `Raytheon`,`Boeing`,`General Dynamics`) %>% 
   kableExtra::kable(align="c", caption = "Demogrpahics of Zip Codes of Defense Contractor Offices", col.names = column_names) %>%
   kableExtra::kable_styling(latex_options = c("hold_position"))
 
 ```
 
-```{r}
+```{r, include=FALSE}
 weighted.mean(Merge$age,Merge$total_pop1, na.rm=TRUE)
 mean(Merge$total_pop1, na.rm=TRUE)
 weighted.mean(Merge$med_income,Merge$total_pop1/1000, na.rm=TRUE)
 ```
-```{r}
+```{r, include=FALSE}
 companyonly <- Merge %>% filter(company!="None")
 companyonly <- companyonly %>% mutate(whiteavg = white/total_pop1)
 companyonly <- companyonly %>% mutate(whiteavg = replace_na(whiteavg, 0))
@@ -180,7 +194,7 @@ weighted.mean(companyonly$med_income,companyonly$total_pop1/1000, na.rm=TRUE)
 weighted.mean(companyonly$whiteavg,  na.rm=TRUE)
 ```
 
-```{r}
+```{r, include=FALSE}
 companyonly <- Merge %>% filter(company=="Lockheed Martin")
 companyonly <- companyonly %>% mutate(whiteavg = white/total_pop1)
 companyonly <- companyonly %>% mutate(whiteavg = replace_na(whiteavg, 0))
@@ -189,7 +203,7 @@ mean(companyonly$total_pop1, na.rm=TRUE)
 weighted.mean(companyonly$med_income,companyonly$total_pop1/1000, na.rm=TRUE)
 weighted.mean(companyonly$whiteavg, companyonly$total_pop1/1000, na.rm=TRUE)
 ```
-```{r}
+```{r, include=FALSE}
 companyonly <- Merge %>% filter(company=="Northrop Grumman")
 companyonly <- companyonly %>% mutate(whiteavg = white/total_pop1)
 companyonly <- companyonly %>% mutate(whiteavg = replace_na(whiteavg, 0))
@@ -198,7 +212,7 @@ mean(companyonly$total_pop1, na.rm=TRUE)
 weighted.mean(companyonly$med_income,companyonly$total_pop1/1000, na.rm=TRUE)
 weighted.mean(companyonly$whiteavg, companyonly$total_pop1/1000, na.rm=TRUE)
 ```
-```{r}
+```{r, include=FALSE}
 companyonly <- Merge %>% filter(company=="Raytheon")
 companyonly <- companyonly %>% mutate(whiteavg = white/total_pop1)
 companyonly <- companyonly %>% mutate(whiteavg = replace_na(whiteavg, 0))
@@ -208,7 +222,7 @@ weighted.mean(companyonly$med_income,companyonly$total_pop1/1000, na.rm=TRUE)
 weighted.mean(companyonly$whiteavg, companyonly$total_pop1/1000, na.rm=TRUE)
 ```
 
-```{r}
+```{r, include=FALSE}
 companyonly <- Merge %>% filter(company=="Boeing")
 companyonly <- companyonly %>% mutate(whiteavg = white/total_pop1)
 companyonly <- companyonly %>% mutate(whiteavg = replace_na(whiteavg, 0))
@@ -217,7 +231,7 @@ mean(companyonly$total_pop1, na.rm=TRUE)
 weighted.mean(companyonly$med_income,companyonly$total_pop1/1000, na.rm=TRUE)
 weighted.mean(companyonly$whiteavg, companyonly$total_pop1/1000, na.rm=TRUE)
 ```
-```{r}
+```{r, include=FALSE}
 companyonly <- Merge %>% filter(company=="General Dynamics")
 companyonly <- companyonly %>% mutate(whiteavg = white/total_pop1)
 companyonly <- companyonly %>% mutate(whiteavg = replace_na(whiteavg, 0))
